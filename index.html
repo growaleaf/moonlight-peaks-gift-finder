@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moonlight Peaks Gift Finder</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; color: #222; background: #fafafa; }
+  h1 { font-size: 1.4rem; }
+  .sub { color: #555; font-size: 0.9rem; margin-bottom: 1.5rem; }
+  label { display: block; font-weight: bold; margin-top: 1.5rem; }
+  input, select { width: 100%; padding: 0.5rem; font-size: 1rem; margin-top: 0.3rem; box-sizing: border-box; }
+  .results { margin-top: 1rem; }
+  .char-card { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem; margin-top: 0.75rem; background: #fff; }
+  .char-card h3 { margin: 0 0 0.4rem 0; }
+  .loved { color: #a0005c; }
+  .liked { color: #0b6e4f; }
+  .neutral { color: #8a6d00; }
+  .hated { color: #555; }
+  .empty { color: #777; font-style: italic; }
+  .list-group { margin-top: 0.3rem; }
+  .list-group span.tag { display: inline-block; margin: 0.15rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.85rem; background: #eee; }
+  .list-group span.tag.hit { background: #ffe9a8; font-weight: bold; }
+  footer { margin-top: 2.5rem; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 0.75rem; }
+</style>
+</head>
+<body>
+
+<h1>Moonlight Peaks Gift Finder</h1>
+<p class="sub">Type an item you're holding to see who loves, likes, is neutral to, or hates it. Or pick a character to see their full gift list.</p>
+
+<label for="item-search">Search by item (flower, drink, material...)</label>
+<input id="item-search" type="text" placeholder="e.g. Black Rose, Diamond, trash" autocomplete="off">
+<div id="item-results" class="results"></div>
+
+<label for="char-select">Or pick a character</label>
+<select id="char-select">
+  <option value="">-- choose a character --</option>
+</select>
+<div id="char-result" class="results"></div>
+
+<footer id="disclosure"></footer>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  var searchBox = document.getElementById("item-search");
+  var itemResults = document.getElementById("item-results");
+  var charSelect = document.getElementById("char-select");
+  var charResult = document.getElementById("char-result");
+  var disclosure = document.getElementById("disclosure");
+
+  MOONLIGHT_CHARACTERS.forEach(function (c) {
+    var opt = document.createElement("option");
+    opt.value = c.name;
+    opt.textContent = c.name;
+    charSelect.appendChild(opt);
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function tagList(items, hitSet) {
+    if (!items.length) return '<span class="empty">none listed</span>';
+    return items.map(function (g) {
+      var isHit = hitSet && hitSet.indexOf(g) !== -1;
+      return '<span class="tag' + (isHit ? ' hit' : '') + '">' + escapeHtml(g) + '</span>';
+    }).join("");
+  }
+
+  function renderItemResults(query) {
+    if (!query.trim()) {
+      itemResults.innerHTML = "";
+      return;
+    }
+    var matches = findGiftMatches(query);
+    if (!matches.length) {
+      itemResults.innerHTML = '<p class="empty">No character on record loves, likes, is neutral to, or hates an item matching "' + escapeHtml(query) + '".</p>';
+      return;
+    }
+    var html = "";
+    matches.forEach(function (m) {
+      html += '<div class="char-card"><h3>' + escapeHtml(m.name) + "</h3>";
+      if (m.lovedHits.length) {
+        html += '<div class="loved">Loved: ' + m.lovedHits.map(escapeHtml).join(", ") + "</div>";
+      }
+      if (m.likedHits.length) {
+        html += '<div class="liked">Liked: ' + m.likedHits.map(escapeHtml).join(", ") + "</div>";
+      }
+      if (m.neutralHits.length) {
+        html += '<div class="neutral">Neutral: ' + m.neutralHits.map(escapeHtml).join(", ") + "</div>";
+      }
+      if (m.hatedHits.length) {
+        html += '<div class="hated">Hated: ' + m.hatedHits.map(escapeHtml).join(", ") + "</div>";
+      }
+      html += "</div>";
+    });
+    itemResults.innerHTML = html;
+  }
+
+  function renderCharacter(name) {
+    if (!name) {
+      charResult.innerHTML = "";
+      return;
+    }
+    var c = findCharacter(name);
+    if (!c) {
+      charResult.innerHTML = "";
+      return;
+    }
+    var html = '<div class="char-card"><h3>' + escapeHtml(c.name) + "</h3>";
+    html += '<div class="loved">Loved</div><div class="list-group">' + tagList(c.loved) + "</div>";
+    html += '<div class="liked" style="margin-top:0.5rem;">Liked</div><div class="list-group">' + tagList(c.liked) + "</div>";
+    html += '<div class="neutral" style="margin-top:0.5rem;">Neutral</div><div class="list-group">' + tagList(c.neutral) + "</div>";
+    html += '<div class="hated" style="margin-top:0.5rem;">Hated</div><div class="list-group">' + tagList(c.hated) + "</div>";
+    html += "</div>";
+    charResult.innerHTML = html;
+  }
+
+  searchBox.addEventListener("input", function () {
+    renderItemResults(searchBox.value);
+  });
+  charSelect.addEventListener("change", function () {
+    renderCharacter(charSelect.value);
+  });
+
+  disclosure.textContent = "Single source: " + MOONLIGHT_SOURCE.url + " (article dated " + MOONLIGHT_SOURCE.articleDate + "), re-fetched " + MOONLIGHT_SOURCE.fetchedOn + ". Category entries (such as \"Any Trash item\" or \"Blue Flowers\") are the source's own wording, kept verbatim rather than expanded. Preferences may change with future game patches. " + MOONLIGHT_CHARACTERS.length + " characters listed.";
+})();
+</script>
+
+</body>
+</html>
